@@ -1,0 +1,127 @@
+import { useState } from 'react';
+
+const defaultPrompt = 'Create a premium fintech landing page for a startup in Lagos with a dark modern theme.';
+
+function App() {
+  const [prompt, setPrompt] = useState(defaultPrompt);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:8000/api/build', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          tone: 'premium',
+          style: 'dark',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Something went wrong');
+      }
+
+      setResult(data);
+    } catch (err) {
+      setError(err.message || 'Failed to build app');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <div className="panel left-panel">
+        <h1>Website & App Builder</h1>
+        <p className="subtitle">Generate a website concept from a short prompt.</p>
+
+        <form onSubmit={handleSubmit}>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={8}
+            placeholder="Describe the app you want..."
+          />
+
+          <button type="submit" disabled={loading}>
+            {loading ? 'Building...' : 'Build App'}
+          </button>
+        </form>
+
+        {error && <div className="error">{error}</div>}
+      </div>
+
+      <div className="panel right-panel">
+        {result ? (
+          <>
+            <div className="result-header">
+              <span className="badge">{result.app_type}</span>
+              <h2>{result.title}</h2>
+            </div>
+
+            <div className="meta-grid">
+              <div>
+                <label>Theme</label>
+                <strong>{result.theme}</strong>
+              </div>
+              <div>
+                <label>Style</label>
+                <strong>{result.style}</strong>
+              </div>
+              <div>
+                <label>City</label>
+                <strong>{result.location?.city || 'N/A'}</strong>
+              </div>
+              <div>
+                <label>Weather</label>
+                <strong>{result.location?.weather || 'N/A'}</strong>
+              </div>
+            </div>
+
+            <div className="preview-box">
+              <h3>Generated preview</h3>
+              <div className="preview-card">
+                <div className="hero">
+                  <span>{result.title}</span>
+                  <h4>{result.hero_headline}</h4>
+                  <p>{result.hero_text}</p>
+                </div>
+
+                <div className="section-list">
+                  {result.pages.map((page) => (
+                    <div key={page} className="mini-card">
+                      {page}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="cta-row">
+                  <button>Get Started</button>
+                  <button className="secondary">View Demo</button>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">
+            <h2>Ready to generate</h2>
+            <p>Your app spec and preview will appear here.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
