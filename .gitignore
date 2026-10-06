@@ -1,107 +1,12 @@
-# Website & App Builder Agent
-
-A free, local-first AI website and app builder that turns a short natural-language prompt into a generated app spec and a simple preview UI.
-
-This project uses:
-- Backend: FastAPI
-- Frontend: React + Vite
-- Free public APIs: Open-Meteo and OpenStreetMap/Nominatim
-- Local AI option: Ollama (optional)
-
-It is designed to work without paid APIs and can run fully on your machine.
-
-## Features
-- Build landing pages, SaaS dashboards, portfolios, mini apps, and blog templates
-- Detect app type from plain English prompt
-- Use public free APIs for city and weather enrichment
-- Generate a preview response on the frontend
-- Optional integration with local Ollama models for AI-generated copy
-
-## Project structure
-
-```text
-website-app-builder-agent/
-├── backend/
-│   ├── main.py
-│   └── requirements.txt
-├── frontend/
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── index.html
-│   └── src/
-│       ├── App.jsx
-│       ├── main.jsx
-│       └── index.css
-├── .gitignore
-├── README.md
-└── start.sh
-```
-
-## Quick start
-
-### 1) Backend
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 2) Frontend
-
-Open a second terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev -- --host 0.0.0.0 --port 5173
-```
-
-Then open:
-
-```text
-http://localhost:5173
-```
-
-## API endpoints
-
-### Health
-
-```bash
-curl http://localhost:8000/api/health
-```
-
-### Build app
-
-```bash
-curl -X POST http://localhost:8000/api/build \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"Create a modern fintech landing page for a startup in Lagos","tone":"premium","style":"dark"}'
-```
-
-## Optional local AI
-
-If you want to use a local LLM instead of hardcoded templates:
-
-1. Install Ollama: https://ollama.com/
-2. Pull a model:
-
-```bash
-ollama pull llama3.1
-```
-
-3. Edit `backend/main.py` and replace the `generate_copy()` function with calls to the local Ollama API.
-
-## Free APIs used
-- Nominatim: geocoding / city lookup
-- Open-Meteo: weather data
-
-## Notes
-- The app is intentionally easy to extend.
-- You can add your own templates or attach a local LLM for richer copy generation.
-- This is intentionally built as a lightweight MVP and remains free to run.
-
-## License
-MIT
+__pycache__/
+*.py[cod]
+*.sqlite3
+.venv/
+venv/
+.env
+node_modules/
+dist/
+.vite/
+.idea/
+.vscode/
+.DS_Store

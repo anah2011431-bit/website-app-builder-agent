@@ -1,37 +1,44 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv
 import requests
 import os
 from typing import Optional
 import logging
 
-# Configure logging
+load_dotenv()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Website App Builder Agent",
     description="Build websites and apps from natural language prompts",
-    version="0.1.0"
+    version="0.1.0",
 )
 
-# CORS middleware
+cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173",
+)
+allow_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Request model
+
 class BuildRequest(BaseModel):
     prompt: str
     tone: str = "modern"
     style: str = "light"
 
-# Response model
+
 class BuildResponse(BaseModel):
     title: str
     app_type: str
@@ -43,12 +50,10 @@ class BuildResponse(BaseModel):
     hero_text: str
     location: Optional[dict] = None
 
-# ==================== UTILITY FUNCTIONS ====================
 
 def classify_prompt(prompt: str) -> str:
-    """Detect app type from prompt."""
     lower = prompt.lower()
-    
+
     if any(word in lower for word in ["dashboard", "analytics", "metrics", "chart"]):
         return "dashboard"
     if any(word in lower for word in ["portfolio", "photographer", "artist", "gallery"]):
@@ -59,11 +64,11 @@ def classify_prompt(prompt: str) -> str:
         return "blog"
     if any(word in lower for word in ["app", "mobile", "prototype"]):
         return "app"
-    
+
     return "landing-page"
 
+
 def extract_city(prompt: str) -> Optional[str]:
-    """Extract city name from prompt."""
     cities = {
         "london": "London",
         "lagos": "Lagos",
@@ -76,53 +81,55 @@ def extract_city(prompt: str) -> Optional[str]:
         "sydney": "Sydney",
         "paris": "Paris",
     }
-    
+
     lower = prompt.lower()
     for key, value in cities.items():
         if key in lower:
             return value
-    
+
     return None
 
+
 def get_city_data(city: str) -> dict:
-    """Fetch city geocoding data from Nominatim."""
     try:
         url = f"https://nominatim.openstreetmap.org/search?q={city}&format=json&limit=1"
         headers = {"User-Agent": "website-app-builder-agent"}
         response = requests.get(url, timeout=5, headers=headers)
-        
+
         if response.status_code == 200 and response.json():
             data = response.json()[0]
             return {
                 "city": city,
                 "lat": float(data.get("lat", 0)),
                 "lon": float(data.get("lon", 0)),
-                "display_name": data.get("display_name", city)
+                "display_name": data.get("display_name", city),
             }
-    except Exception as e:
-        logger.warning(f"Failed to fetch city data for {city}: {e}")
-    
+    except Exception as exc:
+        logger.warning(f"Failed to fetch city data for {city}: {exc}")
+
     return {"city": city}
 
+
 def get_weather(lat: float, lon: float) -> str:
-    """Fetch weather from Open-Meteo."""
     try:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code"
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code"
+        )
         response = requests.get(url, timeout=5)
-        
+
         if response.status_code == 200:
             data = response.json()
             current = data.get("current", {})
-            temp = current.get("temperature_2m", "N/A")
-            return f"{temp}°C"
-    except Exception as e:
-        logger.warning(f"Failed to fetch weather: {e}")
-    
+            temperature = current.get("temperature_2m", "N/A")
+            return f"{temperature}°C"
+    except Exception as exc:
+        logger.warning(f"Failed to fetch weather: {exc}")
+
     return "N/A"
 
+
 def generate_app_spec(prompt: str, app_type: str, tone: str, style: str) -> dict:
-    """Generate app specification based on type."""
-    
     specs = {
         "landing-page": {
             "title": "Premium Landing Page",
@@ -173,58 +180,37 @@ def generate_app_spec(prompt: str, app_type: str, tone: str, style: str) -> dict
             "hero_text": "Built for productivity.",
         },
     }
-    
+
     return specs.get(app_type, specs["landing-page"])
 
-# ==================== API ENDPOINTS ====================
 
-@app.get("/api/health", tags=["Health"])
+@app.get("/api/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "message": "Backend is running"}
+    return {"status": "ok", "message": "Backend is healthy"}
 
-@app.post("/api/build", response_model=BuildResponse, tags=["Builder"])
+
+@app.post("/api/build", response_model=BuildResponse)
 async def build_app(request: BuildRequest):
-    """
-    Build an app spec from a prompt.
-    
-    This endpoint:
-    1. Classifies the prompt to detect app type
-    2. Extracts location if available
-    3. Fetches optional weather data
-    4. Generates app spec based on template
-    
-    Returns a structured response with pages, sections, and metadata.
-    """
-    
     if not request.prompt or len(request.prompt.strip()) < 5:
         raise HTTPException(status_code=400, detail="Prompt must be at least 5 characters")
-    
-    # Classify app type
+
     app_type = classify_prompt(request.prompt)
-    logger.info(f"Classified prompt as: {app_type}")
-    
-    # Extract city and fetch optional data
     city = extract_city(request.prompt)
     location = None
-    
+
     if city:
         city_data = get_city_data(city)
         weather = "N/A"
-        
         if "lat" in city_data and "lon" in city_data:
             weather = get_weather(city_data["lat"], city_data["lon"])
-        
         location = {
             "city": city_data.get("city", city),
-            "weather": weather
+            "weather": weather,
         }
-        logger.info(f"Enriched with location: {location}")
-    
-    # Generate app spec
+
     spec = generate_app_spec(request.prompt, app_type, request.tone, request.style)
-    
-    response = BuildResponse(
+
+    return BuildResponse(
         title=spec["title"],
         app_type=app_type,
         theme=spec["theme"],
@@ -235,60 +221,40 @@ async def build_app(request: BuildRequest):
         hero_text=spec["hero_text"],
         location=location,
     )
-    
-    logger.info(f"Generated spec for: {response.title}")
-    return response
 
-@app.get("/api/templates", tags=["Templates"])
+
+@app.get("/api/templates")
 async def list_templates():
-    """List available app templates."""
     return {
         "templates": [
-            {
-                "id": "landing-page",
-                "name": "Landing Page",
-                "description": "Modern conversion-focused homepage",
-            },
-            {
-                "id": "dashboard",
-                "name": "Analytics Dashboard",
-                "description": "Real-time metrics and visualizations",
-            },
-            {
-                "id": "portfolio",
-                "name": "Portfolio",
-                "description": "Showcase your work and experience",
-            },
-            {
-                "id": "ecommerce",
-                "name": "E-Commerce",
-                "description": "Online store and product catalog",
-            },
-            {
-                "id": "blog",
-                "name": "Blog",
-                "description": "Content publishing platform",
-            },
-            {
-                "id": "app",
-                "name": "Web App",
-                "description": "Interactive web application",
-            },
+            {"id": "landing-page", "name": "Landing Page", "description": "Modern conversion-focused homepage"},
+            {"id": "dashboard", "name": "Analytics Dashboard", "description": "Real-time metrics and visualizations"},
+            {"id": "portfolio", "name": "Portfolio", "description": "Showcase your work and experience"},
+            {"id": "ecommerce", "name": "E-Commerce", "description": "Online store and product catalog"},
+            {"id": "blog", "name": "Blog", "description": "Content publishing platform"},
+            {"id": "app", "name": "Web App", "description": "Interactive web application"},
         ]
     }
 
-# ==================== ROOT ====================
 
-@app.get("/", tags=["Root"])
+@app.get("/")
 async def root():
-    """Root endpoint."""
     return {
         "name": "Website App Builder Agent",
         "version": "0.1.0",
         "docs": "/docs",
-        "api": "/api"
+        "api": "/api",
     }
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(
+        app,
+        host=os.getenv("BACKEND_HOST", "0.0.0.0"),
+        port=int(os.getenv("BACKEND_PORT", "8000")),
+    )
+
+
+# end of file
